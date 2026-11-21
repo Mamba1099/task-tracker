@@ -1,16 +1,14 @@
-
 import axios from "axios";
-const API_BASE_URL = process.env.API_BASE_URL;
 
-const axiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true,
-  timeout: 30000,
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
+const configuredApiUrl = process.env.NEXT_URL?.trim();
+
+if (!configuredApiUrl) {
+  throw new Error("NEXT_PUBLIC_API_URL must be configured");
+}
+
+const api = axios.create({
+  baseURL: `${configuredApiUrl.replace(/\/+$/, "").replace(/\/api\/v1$/, "")}/api`,
+  headers: { "Content-Type": "application/json" },
 });
 
-
-export { axiosInstance as axios };
+export default api;

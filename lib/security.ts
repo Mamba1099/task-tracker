@@ -1,11 +1,7 @@
-// lib/security.ts
-// This module provides security functions for validating origins, CSRF protection,
-// and setting security headers in Next.js applications.
-// It includes functions to validate request origins, CSRF tokens, and set security headers.
 import { NextRequest, NextResponse } from "next/server";
 
-function getAllowedOrigins(): string[] {
-  const origins: string[] = [];
+function getAllowedOrigins(request?: NextRequest): string[] {
+  const origins: string[] = request ? [request.nextUrl.origin] : [];
 
   if (process.env.ALLOWED_ORIGINS) {
     origins.push(
@@ -23,15 +19,24 @@ function getAllowedOrigins(): string[] {
     );
   }
 
+  for (const url of [process.env.AUTH_URL]) {
+    if (!url) continue;
+    try {
+      origins.push(new URL(url).origin);
+    } catch {
+      console.warn(`Invalid auth URL: ${url}`);
+    }
+  }
+
   if (process.env.NODE_ENV === "development") {
-    origins.push("http://localhost:3000", "http://192.168.88.104:3000");
+    origins.push("http://localhost:3000");
   }
 
   return Array.from(new Set(origins));
 }
 
 export function validateOrigin(request: NextRequest): NextResponse | null {
-  const allowedOrigins = getAllowedOrigins();
+  const allowedOrigins = getAllowedOrigins(request);
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
 
@@ -71,7 +76,7 @@ export function validateCSRF(request: NextRequest): NextResponse | null {
     return null;
   }
 
-  const allowedOrigins = getAllowedOrigins();
+  const allowedOrigins = getAllowedOrigins(request);
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
 
@@ -109,24 +114,25 @@ export function validateSecurity(request: NextRequest): NextResponse | null {
 /**
  * Sets security headers and CORS headers on the response
  */
-export function setSecurityHeaders(response: NextResponse, origin?: string | null): NextResponse {
+export function setSecurityHeaders(
+  response: NextResponse,
+  origin?: string | null,
+  request?: NextRequest
+): NextResponse {
   // Security Headers (Existing)
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 
   // CORS Headers (Existing)
-  const allowedOrigins = getAllowedOrigins();
+  const allowedOrigins = getAllowedOrigins(request);
   if (origin && allowedOrigins.includes(origin)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
-  } else if (allowedOrigins.length > 0) {
-    response.headers.set('Access-Control-Allow-Origin', allowedOrigins[0]);
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Access-Control-Max-Age', '86400');
   }
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  response.headers.set('Access-Control-Allow-Credentials', 'true');
-  response.headers.set('Access-Control-Max-Age', '86400');
 
   // Content Security Policy (CSP) - Mitigates XSS, data injection, and mixed content
   response.headers.set(
@@ -144,7 +150,7 @@ export function setSecurityHeaders(response: NextResponse, origin?: string | nul
   );
 
   //Cache-Control - Controls caching behavior (adjust based on sensitivity)
-  response.headers.set('Cache-Control', 'public, max-age=3600, must-revalidate');
+  response.headers.set('Cache-Control', 'no-store');
   response.headers.set('Vary', 'Accept-Encoding, Origin'); // Avoids cache poisoning
 
   return response;
@@ -172,7 +178,7 @@ export function createSecureResponse(
   }
 
   const origin = request?.headers.get("origin");
-  return setSecurityHeaders(response, origin);
+  return setSecurityHeaders(response, origin, request);
 }
 
 /**
@@ -188,5 +194,5 @@ export function createSecureErrorResponse(
     { status }
   );
   const origin = request?.headers.get('origin');
-  return setSecurityHeaders(response, origin);
+  return setSecurityHeaders(response, origin, request);
 }
