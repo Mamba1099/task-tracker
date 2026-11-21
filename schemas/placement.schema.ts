@@ -6,21 +6,35 @@ export const PlacementStatusEnum = z.enum([
   "TERMINATED",
 ]);
 
-export const CreatePlacementSchema = z
+export const OnboardAttacheSchema = z
   .object({
-    attacheId: z.string().cuid("Invalid attaché ID"),
-    supervisorId: z.string().cuid("Invalid supervisor ID"),
+    fullName: z.string().min(2, "Full name is required").max(100),
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
     departmentId: z.string().cuid("Invalid department ID"),
-    startDate: z.string().datetime(),
-    endDate: z.string().datetime(),
+    startDate: z.string().datetime("Invalid start date"),
+    endDate: z.string().datetime("Invalid end date"),
   })
-  .refine(
-    (data) => {
-      return new Date(data.endDate) > new Date(data.startDate);
-    },
-    {
-      message: "End date must be after start date",
-      path: ["endDate"],
-    },
-  );
-export type CreatePlacementInput = z.infer<typeof CreatePlacementSchema>;
+  .refine((d) => new Date(d.endDate) > new Date(d.startDate), {
+    message: "End date must be after start date",
+    path: ["endDate"],
+  });
+export type OnboardAttacheInput = z.infer<typeof OnboardAttacheSchema>;
+
+export const UpdatePlacementStatusSchema = z.object({
+  status: PlacementStatusEnum,
+});
+export type UpdatePlacementStatusInput = z.infer<
+  typeof UpdatePlacementStatusSchema
+>;
+
+export const PlacementResponseSchema = z.object({
+  id: z.string(),
+  attacheId: z.string(),
+  supervisorId: z.string(),
+  departmentId: z.string(),
+  startDate: z.date(),
+  endDate: z.date(),
+  status: PlacementStatusEnum,
+});
+export type PlacementResponse = z.infer<typeof PlacementResponseSchema>;
